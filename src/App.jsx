@@ -217,16 +217,25 @@ function App() {
     setAnalysisStepText('딥러닝 모델 로드 및 텐서 전처리 중...')
 
     try {
-      // 이미지 엘리먼트 로딩 대기
-      if (!previewImgRef.current || !previewImgRef.current.complete) {
-        await new Promise((resolve) => setTimeout(resolve, 300))
-      }
+      // DOM 언마운트와 무관하게 메모리 이미지 객체를 생성하여 안전하게 로드
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.src = previewUrl
+
+      await new Promise((resolve, reject) => {
+        if (img.complete && img.naturalWidth > 0) {
+          resolve()
+          return
+        }
+        img.onload = () => resolve()
+        img.onerror = () => reject(new Error('이미지 로딩에 실패했습니다.'))
+      })
 
       setAnalysisProgress(75)
       setAnalysisStepText('신경망 추론 실행 중 (Softmax 확률 연산)...')
 
-      // 2. 실제 TensorFlow.js 모델 추론 실행 (모의 계산 제거됨)
-      const realPrediction = await classifyWithRealModel(previewImgRef.current)
+      // 2. 실제 TensorFlow.js 모델 추론 실행
+      const realPrediction = await classifyWithRealModel(img)
 
       setAnalysisProgress(100)
       setAnalysisStepText('분석 완료!')
@@ -250,6 +259,7 @@ function App() {
         }, 100)
       }, 350)
     } catch (err) {
+      console.error('모델 추론 오류:', err)
       setAnalysisState('model-missing')
       setErrorMessage(`모델 추론 중 오류가 발생했습니다: ${err.message}`)
     }
